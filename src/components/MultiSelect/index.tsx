@@ -25,6 +25,8 @@ import {
   View,
   ViewStyle,
   StatusBar,
+  Animated,
+  Easing,
 } from 'react-native';
 import { useDetectDevice } from '../../toolkits';
 import { useDeviceOrientation } from '../../useDeviceOrientation';
@@ -97,6 +99,8 @@ const MultiSelectComponent = React.forwardRef<
     mode = 'default',
     excludeItems = [],
     excludeSearchItems = [],
+    animationDuration = 250,
+    animationEnabled = true,
   } = props;
 
   const ref = useRef<View>(null);
@@ -107,6 +111,13 @@ const MultiSelectComponent = React.forwardRef<
   const [position, setPosition] = useState<any>();
   const [keyboardHeight, setKeyboardHeight] = useState<number>(0);
   const [searchText, setSearchText] = useState('');
+
+  // Animation
+  const [fadeAnim] = useState(new Animated.Value(0));
+  const [scaleAnim] = useState(new Animated.Value(0));
+  const [translateYAnim] = useState(new Animated.Value(0));
+  const animatingRef = useRef<boolean>(false);
+  const measuredHeightRef = useRef<number>(0);
 
   const { width: W, height: H } = Dimensions.get('window');
   const styleContainerVertical: ViewStyle = useMemo(() => {
@@ -159,10 +170,107 @@ const MultiSelectComponent = React.forwardRef<
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data, searchText]);
 
+  const animateIn = useCallback(() => {
+    animatingRef.current = true;
+    const totalTranslateY =
+      (position?.height ?? 0) + (measuredHeightRef.current || maxHeight) / 2;
+    translateYAnim.setValue(-totalTranslateY);
+
+    if (!animationEnabled) {
+      fadeAnim.setValue(1);
+      scaleAnim.setValue(1);
+      translateYAnim.setValue(0);
+      animatingRef.current = false;
+      return;
+    }
+
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: animationDuration,
+        useNativeDriver: true,
+        easing: Easing.out(Easing.ease),
+      }),
+      Animated.timing(scaleAnim, {
+        toValue: 1,
+        duration: animationDuration,
+        useNativeDriver: true,
+        easing: Easing.out(Easing.ease),
+      }),
+      Animated.timing(translateYAnim, {
+        toValue: 0,
+        duration: animationDuration,
+        useNativeDriver: true,
+        easing: Easing.out(Easing.ease),
+      }),
+    ]).start(() => {
+      animatingRef.current = false;
+    });
+  }, [
+    animationDuration,
+    animationEnabled,
+    fadeAnim,
+    maxHeight,
+    position?.height,
+    scaleAnim,
+    translateYAnim,
+  ]);
+
+  const animateOut = useCallback(
+    (callback?: () => void) => {
+      animatingRef.current = true;
+
+      if (!animationEnabled) {
+        fadeAnim.setValue(0);
+        scaleAnim.setValue(0);
+        animatingRef.current = false;
+        callback?.();
+        return;
+      }
+
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 0,
+          duration: animationDuration,
+          useNativeDriver: true,
+          easing: Easing.in(Easing.ease),
+        }),
+        Animated.timing(scaleAnim, {
+          toValue: 0,
+          duration: animationDuration,
+          useNativeDriver: true,
+          easing: Easing.in(Easing.ease),
+        }),
+        Animated.timing(translateYAnim, {
+          toValue: -(
+            (position?.height ?? 0) +
+            (measuredHeightRef.current || maxHeight) / 2
+          ),
+          duration: animationDuration,
+          useNativeDriver: true,
+          easing: Easing.in(Easing.ease),
+        }),
+      ]).start(() => {
+        animatingRef.current = false;
+        callback?.();
+      });
+    },
+    [
+      animationDuration,
+      animationEnabled,
+      fadeAnim,
+      maxHeight,
+      position?.height,
+      scaleAnim,
+      translateYAnim,
+    ]
+  );
+
   const eventOpen = () => {
     if (!disable) {
       _measure();
       setVisible(true);
+      setTimeout(() => animateIn(), 50);
       if (onFocus) {
         onFocus();
       }
@@ -173,14 +281,16 @@ const MultiSelectComponent = React.forwardRef<
     }
   };
 
-  const eventClose = () => {
-    if (!disable) {
-      setVisible(false);
-      if (onBlur) {
-        onBlur();
-      }
+  const eventClose = useCallback(() => {
+    if (!disable && !animatingRef.current) {
+      animateOut(() => {
+        setVisible(false);
+        if (onBlur) {
+          onBlur();
+        }
+      });
     }
-  };
+  }, [animateOut, disable, onBlur]);
 
   const font = useCallback(() => {
     if (fontFamily) {
@@ -262,7 +372,7 @@ const MultiSelectComponent = React.forwardRef<
   }, [getValue, value]);
 
   const showOrClose = useCallback(() => {
-    if (!disable) {
+    if (!disable && !animatingRef.current) {
       const visibleStatus = !visible;
 
       if (keyboardHeight > 0 && !visibleStatus) {
@@ -270,7 +380,15 @@ const MultiSelectComponent = React.forwardRef<
       }
 
       _measure();
-      setVisible(visibleStatus);
+
+      if (visibleStatus) {
+        setVisible(true);
+        setTimeout(() => animateIn(), 50);
+      } else {
+        animateOut(() => {
+          setVisible(false);
+        });
+      }
 
       if (data) {
         const filterData = excludeData(data);
@@ -301,6 +419,8 @@ const MultiSelectComponent = React.forwardRef<
     searchText,
     onFocus,
     onBlur,
+    animateIn,
+    animateOut,
   ]);
 
   const onSearch = useCallback(
@@ -645,9 +765,15 @@ const MultiSelectComponent = React.forwardRef<
             statusBarTranslucent
             visible={visible}
             supportedOrientations={['landscape', 'portrait']}
-            onRequestClose={showOrClose}
+            onRequestClose={() => {
+              if (!animatingRef.current) {
+                showOrClose();
+              }
+            }}
           >
-            <TouchableWithoutFeedback onPress={showOrClose}>
+            <TouchableWithoutFeedback
+              onPress={() => !animatingRef.current && showOrClose()}
+            >
               <View
                 style={StyleSheet.flatten([
                   styles.flex1,
@@ -668,18 +794,23 @@ const MultiSelectComponent = React.forwardRef<
                     isFull && styles.fullScreen,
                   ])}
                 >
-                  <View
+                  <Animated.View
                     style={StyleSheet.flatten([
                       styles.container,
                       isFull ? styleHorizontal : styleVertical,
                       {
                         width,
+                        opacity: fadeAnim,
+                        transform: [
+                          { translateY: translateYAnim },
+                          { scale: scaleAnim },
+                        ],
                       },
                       containerStyle,
                     ])}
                   >
                     {_renderList(isTopPosition)}
-                  </View>
+                  </Animated.View>
                 </View>
               </View>
             </TouchableWithoutFeedback>
@@ -704,6 +835,51 @@ const MultiSelectComponent = React.forwardRef<
     containerStyle,
     styleHorizontal,
     _renderList,
+    fadeAnim,
+    scaleAnim,
+    translateYAnim,
+  ]);
+
+  const _renderInvisibleDropdown = useCallback(() => {
+    if (!position) return null;
+    const { isFull, width, left } = position;
+
+    const styleVertical: ViewStyle = {
+      left,
+      maxHeight: maxHeight,
+      minHeight: minHeight,
+    };
+
+    return (
+      <View
+        pointerEvents="none"
+        onLayout={(e) => {
+          measuredHeightRef.current = e.nativeEvent.layout.height;
+        }}
+        style={StyleSheet.flatten([
+          styles.container,
+          isFull ? styleHorizontal : styleVertical,
+          { width, opacity: 0, position: 'absolute' },
+          containerStyle,
+        ])}
+      >
+        <View style={styles.flexShrink}>
+          {renderSearch()}
+          {listData && listData.length > 0
+            ? listData.map((item, index) => _renderItem({ item, index }))
+            : null}
+        </View>
+      </View>
+    );
+  }, [
+    position,
+    maxHeight,
+    minHeight,
+    styleHorizontal,
+    containerStyle,
+    renderSearch,
+    listData,
+    _renderItem,
   ]);
 
   const unSelect = (item: any) => {
@@ -798,6 +974,7 @@ const MultiSelectComponent = React.forwardRef<
       >
         {_renderDropdownInside()}
         {_renderModal()}
+        {_renderInvisibleDropdown()}
       </View>
     );
   };
@@ -855,6 +1032,7 @@ const MultiSelectComponent = React.forwardRef<
       >
         {_renderDropdown()}
         {_renderModal()}
+        {_renderInvisibleDropdown()}
       </View>
       {(!visible || alwaysRenderSelectedItem) &&
         visibleSelectedItem &&
