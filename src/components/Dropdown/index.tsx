@@ -113,6 +113,7 @@ const DropdownComponent = React.forwardRef<IDropdownRef, DropdownProps<any>>(
     const [searchText, setSearchText] = useState('');
 
     // Added for animation
+    const [dynamicWidth, setDynamicWidth] = useState<number>(0);
     const [fadeAnim] = useState(new Animated.Value(0));
     const [scaleAnim] = useState(new Animated.Value(0));
     const [translateXAnim] = useState(new Animated.Value(0));
@@ -177,7 +178,8 @@ const DropdownComponent = React.forwardRef<IDropdownRef, DropdownProps<any>>(
         -((position?.height ?? 0) + measuredHeightRef.current / 2) +
         animationOffsetY;
       translateYAnim.setValue(totalTranslateY);
-      const totalTranslateX = -((position?.width ?? 0) / 2) + animationOffsetX;
+      const totalTranslateX =
+        -(((dynamicWidth || position?.width) ?? 0) / 2) + animationOffsetX;
       translateXAnim.setValue(totalTranslateX);
 
       if (!animationEnabled) {
@@ -222,6 +224,7 @@ const DropdownComponent = React.forwardRef<IDropdownRef, DropdownProps<any>>(
       animationEnabled,
       animationOffsetX,
       animationOffsetY,
+      dynamicWidth,
       fadeAnim,
       position?.height,
       position?.width,
@@ -257,7 +260,9 @@ const DropdownComponent = React.forwardRef<IDropdownRef, DropdownProps<any>>(
             easing: Easing.in(Easing.ease),
           }),
           Animated.timing(translateXAnim, {
-            toValue: -((position?.width ?? 0) / 2) + animationOffsetX,
+            toValue:
+              -(((dynamicWidth || position?.width) ?? 0) / 2) +
+              animationOffsetX,
             duration: animationDuration,
             useNativeDriver: true,
             easing: Easing.in(Easing.ease),
@@ -280,6 +285,7 @@ const DropdownComponent = React.forwardRef<IDropdownRef, DropdownProps<any>>(
         animationEnabled,
         animationOffsetX,
         animationOffsetY,
+        dynamicWidth,
         fadeAnim,
         position?.height,
         position?.width,
@@ -326,32 +332,41 @@ const DropdownComponent = React.forwardRef<IDropdownRef, DropdownProps<any>>(
       }
     }, [fontFamily]);
 
-    const _measure = useCallback(() => {
-      if (ref && ref?.current) {
-        ref.current.measureInWindow((pageX, pageY, width, height) => {
-          let isFull = isTablet
-            ? false
-            : mode === 'modal' || orientation === 'LANDSCAPE';
+    const _measure = useCallback(
+      (e?) => {
+        if (ref && ref?.current) {
+          ref.current.measureInWindow((pageX, pageY, width, height) => {
+            let isFull = isTablet
+              ? false
+              : mode === 'modal' || orientation === 'LANDSCAPE';
 
-          if (mode === 'auto') {
-            isFull = false;
-          }
+            if (mode === 'auto') {
+              isFull = false;
+            }
 
-          const top = isFull ? 20 : height + pageY + 2;
-          const bottom = H - top + height;
-          const left = I18nManager.isRTL ? W - width - pageX : pageX;
+            const top = isFull ? 20 : height + pageY + 2;
+            const bottom = H - top + height;
+            const left = I18nManager.isRTL ? W - width - pageX : pageX;
 
-          setPosition({
-            isFull,
-            width: Math.floor(width),
-            top: Math.floor(top + statusBarHeight),
-            bottom: Math.floor(bottom - statusBarHeight),
-            left: Math.floor(left),
-            height: Math.floor(height),
+            setPosition({
+              isFull,
+              width: Math.floor(width),
+              top: Math.floor(top + statusBarHeight),
+              bottom: Math.floor(bottom - statusBarHeight),
+              left: Math.floor(left),
+              height: Math.floor(height),
+            });
           });
-        });
-      }
-    }, [H, W, orientation, mode]);
+        }
+
+        // For handling the dropdown width change dynamically
+        if (e) {
+          const layoutWidth = e?.nativeEvent?.layout?.width || 0;
+          setDynamicWidth(Math.floor(layoutWidth));
+        }
+      },
+      [H, W, orientation, mode]
+    );
 
     const onKeyboardDidShow = useCallback(
       (e: KeyboardEvent) => {
