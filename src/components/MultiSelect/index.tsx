@@ -101,6 +101,7 @@ const MultiSelectComponent = React.forwardRef<
     excludeSearchItems = [],
     animationDuration = 250,
     animationEnabled = true,
+    animationOffsetY = 0,
   } = props;
 
   const ref = useRef<View>(null);
@@ -173,7 +174,9 @@ const MultiSelectComponent = React.forwardRef<
   const animateIn = useCallback(() => {
     animatingRef.current = true;
     const totalTranslateY =
-      (position?.height ?? 0) + (measuredHeightRef.current || maxHeight) / 2;
+      (position?.height ?? 0) +
+      (measuredHeightRef.current || maxHeight) / 2 +
+      animationOffsetY;
     translateYAnim.setValue(-totalTranslateY);
 
     if (!animationEnabled) {
@@ -209,6 +212,7 @@ const MultiSelectComponent = React.forwardRef<
   }, [
     animationDuration,
     animationEnabled,
+    animationOffsetY,
     fadeAnim,
     maxHeight,
     position?.height,
@@ -244,7 +248,8 @@ const MultiSelectComponent = React.forwardRef<
         Animated.timing(translateYAnim, {
           toValue: -(
             (position?.height ?? 0) +
-            (measuredHeightRef.current || maxHeight) / 2
+            (measuredHeightRef.current || maxHeight) / 2 +
+            animationOffsetY
           ),
           duration: animationDuration,
           useNativeDriver: true,
@@ -258,6 +263,7 @@ const MultiSelectComponent = React.forwardRef<
     [
       animationDuration,
       animationEnabled,
+      animationOffsetY,
       fadeAnim,
       maxHeight,
       position?.height,
