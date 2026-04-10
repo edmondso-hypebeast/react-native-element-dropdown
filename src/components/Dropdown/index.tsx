@@ -97,6 +97,7 @@ const DropdownComponent = React.forwardRef<IDropdownRef, DropdownProps<any>>(
       closeModalWhenSelectedItem = true,
       animationDuration = 250,
       animationEnabled = true,
+      animationOffsetX = 0,
       animationOffsetY = 0,
       excludeItems = [],
       excludeSearchItems = [],
@@ -173,11 +174,11 @@ const DropdownComponent = React.forwardRef<IDropdownRef, DropdownProps<any>>(
     const animateIn = useCallback(() => {
       animatingRef.current = true;
       const totalTranslateY =
-        (position?.height ?? 0) +
-        measuredHeightRef.current / 2 +
+        -((position?.height ?? 0) + measuredHeightRef.current / 2) +
         animationOffsetY;
-      translateYAnim.setValue(-totalTranslateY);
-      translateXAnim.setValue(-(position?.width ?? 0) / 2);
+      translateYAnim.setValue(totalTranslateY);
+      const totalTranslateX = -((position?.width ?? 0) / 2) + animationOffsetX;
+      translateXAnim.setValue(totalTranslateX);
 
       if (!animationEnabled) {
         fadeAnim.setValue(1);
@@ -219,6 +220,7 @@ const DropdownComponent = React.forwardRef<IDropdownRef, DropdownProps<any>>(
     }, [
       animationDuration,
       animationEnabled,
+      animationOffsetX,
       animationOffsetY,
       fadeAnim,
       position?.height,
@@ -255,17 +257,15 @@ const DropdownComponent = React.forwardRef<IDropdownRef, DropdownProps<any>>(
             easing: Easing.in(Easing.ease),
           }),
           Animated.timing(translateXAnim, {
-            toValue: -(position?.width ?? 0) / 2,
+            toValue: -((position?.width ?? 0) / 2) + animationOffsetX,
             duration: animationDuration,
             useNativeDriver: true,
             easing: Easing.in(Easing.ease),
           }),
           Animated.timing(translateYAnim, {
-            toValue: -(
-              (position?.height ?? 0) +
-              measuredHeightRef.current / 2 +
-              animationOffsetY
-            ),
+            toValue:
+              -((position?.height ?? 0) + measuredHeightRef.current / 2) +
+              animationOffsetY,
             duration: animationDuration,
             useNativeDriver: true,
             easing: Easing.in(Easing.ease),
@@ -278,6 +278,7 @@ const DropdownComponent = React.forwardRef<IDropdownRef, DropdownProps<any>>(
       [
         animationDuration,
         animationEnabled,
+        animationOffsetX,
         animationOffsetY,
         fadeAnim,
         position?.height,
