@@ -96,6 +96,7 @@ const DropdownComponent = React.forwardRef<IDropdownRef, DropdownProps<any>>(
       mode = 'default',
       closeModalWhenSelectedItem = true,
       animationDuration = 250,
+      animationEnabled = true,
       excludeItems = [],
       excludeSearchItems = [],
     } = props;
@@ -170,6 +171,15 @@ const DropdownComponent = React.forwardRef<IDropdownRef, DropdownProps<any>>(
       animatingRef.current = true;
       const totalTranslateY = (position?.height ?? 0) + maxHeight / 2;
       translateYAnim.setValue(-totalTranslateY);
+
+      if (!animationEnabled) {
+        fadeAnim.setValue(1);
+        scaleAnim.setValue(1);
+        translateYAnim.setValue(0);
+        animatingRef.current = false;
+        return;
+      }
+
       Animated.parallel([
         Animated.timing(fadeAnim, {
           toValue: 1,
@@ -194,6 +204,7 @@ const DropdownComponent = React.forwardRef<IDropdownRef, DropdownProps<any>>(
       });
     }, [
       animationDuration,
+      animationEnabled,
       fadeAnim,
       maxHeight,
       position?.height,
@@ -204,6 +215,15 @@ const DropdownComponent = React.forwardRef<IDropdownRef, DropdownProps<any>>(
     const animateOut = useCallback(
       (callback?: () => void) => {
         animatingRef.current = true;
+
+        if (!animationEnabled) {
+          fadeAnim.setValue(0);
+          scaleAnim.setValue(0);
+          animatingRef.current = false;
+          callback?.();
+          return;
+        }
+
         Animated.parallel([
           Animated.timing(fadeAnim, {
             toValue: 0,
@@ -230,6 +250,7 @@ const DropdownComponent = React.forwardRef<IDropdownRef, DropdownProps<any>>(
       },
       [
         animationDuration,
+        animationEnabled,
         fadeAnim,
         maxHeight,
         position?.height,
