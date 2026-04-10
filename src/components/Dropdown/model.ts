@@ -57,6 +57,7 @@ export interface DropdownProps<T> {
   inverted?: boolean;
   mode?: 'default' | 'modal' | 'auto';
   closeModalWhenSelectedItem?: boolean;
+  animationDuration?: number;
   excludeItems?: T[];
   excludeSearchItems?: T[];
   onChange: (item: T) => void;

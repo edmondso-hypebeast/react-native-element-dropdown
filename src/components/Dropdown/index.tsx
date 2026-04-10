@@ -29,6 +29,8 @@ import {
   TouchableWithoutFeedback,
   View,
   ViewStyle,
+  Animated,
+  Easing,
 } from 'react-native';
 import { useDetectDevice } from '../../toolkits';
 import { useDeviceOrientation } from '../../useDeviceOrientation';
@@ -93,6 +95,7 @@ const DropdownComponent = React.forwardRef<IDropdownRef, DropdownProps<any>>(
       itemAccessibilityLabelField,
       mode = 'default',
       closeModalWhenSelectedItem = true,
+      animationDuration = 250,
       excludeItems = [],
       excludeSearchItems = [],
     } = props;
@@ -105,6 +108,12 @@ const DropdownComponent = React.forwardRef<IDropdownRef, DropdownProps<any>>(
     const [position, setPosition] = useState<any>();
     const [keyboardHeight, setKeyboardHeight] = useState<number>(0);
     const [searchText, setSearchText] = useState('');
+
+    // Added for animation
+    const [fadeAnim] = useState(new Animated.Value(0));
+    const [scaleAnim] = useState(new Animated.Value(0));
+    const [translateYAnim] = useState(new Animated.Value(0));
+    const animatingRef = useRef<boolean>(false);
 
     const { width: W, height: H } = Dimensions.get('window');
     const styleContainerVertical: ViewStyle = useMemo(() => {
@@ -157,10 +166,85 @@ const DropdownComponent = React.forwardRef<IDropdownRef, DropdownProps<any>>(
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [data, searchText]);
 
+    const animateIn = useCallback(() => {
+      animatingRef.current = true;
+      const totalTranslateY = (position?.height ?? 0) + maxHeight / 2;
+      translateYAnim.setValue(-totalTranslateY);
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: animationDuration,
+          useNativeDriver: true,
+          easing: Easing.out(Easing.ease),
+        }),
+        Animated.timing(scaleAnim, {
+          toValue: 1,
+          duration: animationDuration,
+          useNativeDriver: true,
+          easing: Easing.out(Easing.ease),
+        }),
+        Animated.timing(translateYAnim, {
+          toValue: 0,
+          duration: animationDuration,
+          useNativeDriver: true,
+          easing: Easing.out(Easing.ease),
+        }),
+      ]).start(() => {
+        animatingRef.current = false;
+      });
+    }, [
+      animationDuration,
+      fadeAnim,
+      maxHeight,
+      position?.height,
+      scaleAnim,
+      translateYAnim,
+    ]);
+
+    const animateOut = useCallback(
+      (callback?: () => void) => {
+        animatingRef.current = true;
+        Animated.parallel([
+          Animated.timing(fadeAnim, {
+            toValue: 0,
+            duration: animationDuration,
+            useNativeDriver: true,
+            easing: Easing.in(Easing.ease),
+          }),
+          Animated.timing(scaleAnim, {
+            toValue: 0,
+            duration: animationDuration,
+            useNativeDriver: true,
+            easing: Easing.in(Easing.ease),
+          }),
+          Animated.timing(translateYAnim, {
+            toValue: -((position?.height ?? 0) + maxHeight / 2),
+            duration: animationDuration,
+            useNativeDriver: true,
+            easing: Easing.in(Easing.ease),
+          }),
+        ]).start(() => {
+          animatingRef.current = false;
+          callback?.();
+        });
+      },
+      [
+        animationDuration,
+        fadeAnim,
+        maxHeight,
+        position?.height,
+        scaleAnim,
+        translateYAnim,
+      ]
+    );
+
     const eventOpen = () => {
       if (!disable) {
         _measure();
         setVisible(true);
+        // Add animation trigger
+        setTimeout(() => animateIn(), 50); // Small delay to ensure modal is visible
+
         if (onFocus) {
           onFocus();
         }
@@ -170,15 +254,16 @@ const DropdownComponent = React.forwardRef<IDropdownRef, DropdownProps<any>>(
         }
       }
     };
-
     const eventClose = useCallback(() => {
-      if (!disable) {
-        setVisible(false);
-        if (onBlur) {
-          onBlur();
-        }
+      if (!disable && !animatingRef.current) {
+        animateOut(() => {
+          setVisible(false);
+          if (onBlur) {
+            onBlur();
+          }
+        });
       }
-    }, [disable, onBlur]);
+    }, [disable, onBlur, animateOut]);
 
     const font = useCallback(() => {
       if (fontFamily) {
@@ -305,7 +390,7 @@ const DropdownComponent = React.forwardRef<IDropdownRef, DropdownProps<any>>(
     );
 
     const showOrClose = useCallback(() => {
-      if (!disable) {
+      if (!disable && !animatingRef.current) {
         const visibleStatus = !visible;
 
         if (keyboardHeight > 0 && !visibleStatus) {
@@ -321,7 +406,15 @@ const DropdownComponent = React.forwardRef<IDropdownRef, DropdownProps<any>>(
         }
 
         _measure();
-        setVisible(visibleStatus);
+
+        if (visibleStatus) {
+          setVisible(true);
+          setTimeout(() => animateIn(), 50);
+        } else {
+          animateOut(() => {
+            setVisible(false);
+          });
+        }
 
         if (data) {
           const filterData = excludeData(data);
@@ -352,6 +445,8 @@ const DropdownComponent = React.forwardRef<IDropdownRef, DropdownProps<any>>(
       searchText,
       onFocus,
       onBlur,
+      animateIn,
+      animateOut,
     ]);
 
     const onSearch = useCallback(
@@ -645,7 +740,6 @@ const DropdownComponent = React.forwardRef<IDropdownRef, DropdownProps<any>>(
           if (keyboardHeight > 0) {
             return bottom < keyboardHeight + height;
           }
-
           return bottom < (search ? 150 : 100);
         };
 
@@ -661,8 +755,8 @@ const DropdownComponent = React.forwardRef<IDropdownRef, DropdownProps<any>>(
               : dropdownPosition === 'top';
 
           let keyboardStyle: ViewStyle = {};
-
           let extendHeight = !isTopPosition ? top : bottom;
+
           if (
             keyboardAvoiding &&
             keyboardHeight > 0 &&
@@ -678,9 +772,15 @@ const DropdownComponent = React.forwardRef<IDropdownRef, DropdownProps<any>>(
               statusBarTranslucent
               visible={visible}
               supportedOrientations={['landscape', 'portrait']}
-              onRequestClose={showOrClose}
+              onRequestClose={() => {
+                if (!animatingRef.current) {
+                  showOrClose();
+                }
+              }}
             >
-              <TouchableWithoutFeedback onPress={showOrClose}>
+              <TouchableWithoutFeedback
+                onPress={() => !animatingRef.current && showOrClose()}
+              >
                 <View
                   style={StyleSheet.flatten([
                     styles.flex1,
@@ -701,18 +801,23 @@ const DropdownComponent = React.forwardRef<IDropdownRef, DropdownProps<any>>(
                       isFull && styles.fullScreen,
                     ])}
                   >
-                    <View
+                    <Animated.View
                       style={StyleSheet.flatten([
                         styles.container,
                         isFull ? styleHorizontal : styleVertical,
                         {
                           width,
+                          opacity: fadeAnim,
+                          transform: [
+                            { translateY: translateYAnim },
+                            { scale: scaleAnim },
+                          ],
                         },
                         containerStyle,
                       ])}
                     >
                       {_renderList(isTopPosition)}
-                    </View>
+                    </Animated.View>
                   </View>
                 </View>
               </TouchableWithoutFeedback>
@@ -737,6 +842,9 @@ const DropdownComponent = React.forwardRef<IDropdownRef, DropdownProps<any>>(
       containerStyle,
       styleHorizontal,
       _renderList,
+      fadeAnim,
+      scaleAnim,
+      translateYAnim,
     ]);
 
     return (
