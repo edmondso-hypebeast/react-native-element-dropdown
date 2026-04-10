@@ -65,6 +65,7 @@ export interface MultiSelectProps<T> {
   excludeSearchItems?: T[];
   animationDuration?: number;
   animationEnabled?: boolean;
+  animationOffsetX?: number;
   animationOffsetY?: number;
   onChange: (value: string[]) => void;
   renderLeftIcon?: (visible?: boolean) => React.ReactElement | null;

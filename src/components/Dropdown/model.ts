@@ -59,6 +59,7 @@ export interface DropdownProps<T> {
   closeModalWhenSelectedItem?: boolean;
   animationDuration?: number;
   animationEnabled?: boolean;
+  animationOffsetX?: number;
   animationOffsetY?: number;
   excludeItems?: T[];
   excludeSearchItems?: T[];

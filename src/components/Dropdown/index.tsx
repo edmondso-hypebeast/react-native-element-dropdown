@@ -97,6 +97,7 @@ const DropdownComponent = React.forwardRef<IDropdownRef, DropdownProps<any>>(
       closeModalWhenSelectedItem = true,
       animationDuration = 250,
       animationEnabled = true,
+      animationOffsetX = 0,
       animationOffsetY = 0,
       excludeItems = [],
       excludeSearchItems = [],
@@ -112,8 +113,10 @@ const DropdownComponent = React.forwardRef<IDropdownRef, DropdownProps<any>>(
     const [searchText, setSearchText] = useState('');
 
     // Added for animation
+    const [dynamicWidth, setDynamicWidth] = useState<number>(0);
     const [fadeAnim] = useState(new Animated.Value(0));
     const [scaleAnim] = useState(new Animated.Value(0));
+    const [translateXAnim] = useState(new Animated.Value(0));
     const [translateYAnim] = useState(new Animated.Value(0));
     const animatingRef = useRef<boolean>(false);
     const measuredHeightRef = useRef<number>(0);
@@ -172,14 +175,17 @@ const DropdownComponent = React.forwardRef<IDropdownRef, DropdownProps<any>>(
     const animateIn = useCallback(() => {
       animatingRef.current = true;
       const totalTranslateY =
-        (position?.height ?? 0) +
-        measuredHeightRef.current / 2 +
+        -((position?.height ?? 0) + measuredHeightRef.current / 2) +
         animationOffsetY;
-      translateYAnim.setValue(-totalTranslateY);
+      translateYAnim.setValue(totalTranslateY);
+      const totalTranslateX =
+        -(((dynamicWidth || position?.width) ?? 0) / 2) + animationOffsetX;
+      translateXAnim.setValue(totalTranslateX);
 
       if (!animationEnabled) {
         fadeAnim.setValue(1);
         scaleAnim.setValue(1);
+        translateXAnim.setValue(0);
         translateYAnim.setValue(0);
         animatingRef.current = false;
         return;
@@ -198,6 +204,12 @@ const DropdownComponent = React.forwardRef<IDropdownRef, DropdownProps<any>>(
           useNativeDriver: true,
           easing: Easing.out(Easing.ease),
         }),
+        Animated.timing(translateXAnim, {
+          toValue: 0,
+          duration: animationDuration,
+          useNativeDriver: true,
+          easing: Easing.out(Easing.ease),
+        }),
         Animated.timing(translateYAnim, {
           toValue: 0,
           duration: animationDuration,
@@ -210,10 +222,14 @@ const DropdownComponent = React.forwardRef<IDropdownRef, DropdownProps<any>>(
     }, [
       animationDuration,
       animationEnabled,
+      animationOffsetX,
       animationOffsetY,
+      dynamicWidth,
       fadeAnim,
       position?.height,
+      position?.width,
       scaleAnim,
+      translateXAnim,
       translateYAnim,
     ]);
 
@@ -224,6 +240,7 @@ const DropdownComponent = React.forwardRef<IDropdownRef, DropdownProps<any>>(
         if (!animationEnabled) {
           fadeAnim.setValue(0);
           scaleAnim.setValue(0);
+          translateXAnim.setValue(0);
           animatingRef.current = false;
           callback?.();
           return;
@@ -242,12 +259,18 @@ const DropdownComponent = React.forwardRef<IDropdownRef, DropdownProps<any>>(
             useNativeDriver: true,
             easing: Easing.in(Easing.ease),
           }),
+          Animated.timing(translateXAnim, {
+            toValue:
+              -(((dynamicWidth || position?.width) ?? 0) / 2) +
+              animationOffsetX,
+            duration: animationDuration,
+            useNativeDriver: true,
+            easing: Easing.in(Easing.ease),
+          }),
           Animated.timing(translateYAnim, {
-            toValue: -(
-              (position?.height ?? 0) +
-              measuredHeightRef.current / 2 +
-              animationOffsetY
-            ),
+            toValue:
+              -((position?.height ?? 0) + measuredHeightRef.current / 2) +
+              animationOffsetY,
             duration: animationDuration,
             useNativeDriver: true,
             easing: Easing.in(Easing.ease),
@@ -260,10 +283,14 @@ const DropdownComponent = React.forwardRef<IDropdownRef, DropdownProps<any>>(
       [
         animationDuration,
         animationEnabled,
+        animationOffsetX,
         animationOffsetY,
+        dynamicWidth,
         fadeAnim,
         position?.height,
+        position?.width,
         scaleAnim,
+        translateXAnim,
         translateYAnim,
       ]
     );
@@ -305,32 +332,41 @@ const DropdownComponent = React.forwardRef<IDropdownRef, DropdownProps<any>>(
       }
     }, [fontFamily]);
 
-    const _measure = useCallback(() => {
-      if (ref && ref?.current) {
-        ref.current.measureInWindow((pageX, pageY, width, height) => {
-          let isFull = isTablet
-            ? false
-            : mode === 'modal' || orientation === 'LANDSCAPE';
+    const _measure = useCallback(
+      (e?) => {
+        if (ref && ref?.current) {
+          ref.current.measureInWindow((pageX, pageY, width, height) => {
+            let isFull = isTablet
+              ? false
+              : mode === 'modal' || orientation === 'LANDSCAPE';
 
-          if (mode === 'auto') {
-            isFull = false;
-          }
+            if (mode === 'auto') {
+              isFull = false;
+            }
 
-          const top = isFull ? 20 : height + pageY + 2;
-          const bottom = H - top + height;
-          const left = I18nManager.isRTL ? W - width - pageX : pageX;
+            const top = isFull ? 20 : height + pageY + 2;
+            const bottom = H - top + height;
+            const left = I18nManager.isRTL ? W - width - pageX : pageX;
 
-          setPosition({
-            isFull,
-            width: Math.floor(width),
-            top: Math.floor(top + statusBarHeight),
-            bottom: Math.floor(bottom - statusBarHeight),
-            left: Math.floor(left),
-            height: Math.floor(height),
+            setPosition({
+              isFull,
+              width: Math.floor(width),
+              top: Math.floor(top + statusBarHeight),
+              bottom: Math.floor(bottom - statusBarHeight),
+              left: Math.floor(left),
+              height: Math.floor(height),
+            });
           });
-        });
-      }
-    }, [H, W, orientation, mode]);
+        }
+
+        // For handling the dropdown width change dynamically
+        if (e) {
+          const layoutWidth = e?.nativeEvent?.layout?.width || 0;
+          setDynamicWidth(Math.floor(layoutWidth));
+        }
+      },
+      [H, W, orientation, mode]
+    );
 
     const onKeyboardDidShow = useCallback(
       (e: KeyboardEvent) => {
@@ -839,6 +875,7 @@ const DropdownComponent = React.forwardRef<IDropdownRef, DropdownProps<any>>(
                           width,
                           opacity: fadeAnim,
                           transform: [
+                            { translateX: translateXAnim },
                             { translateY: translateYAnim },
                             { scale: scaleAnim },
                           ],
@@ -874,6 +911,7 @@ const DropdownComponent = React.forwardRef<IDropdownRef, DropdownProps<any>>(
       _renderList,
       fadeAnim,
       scaleAnim,
+      translateXAnim,
       translateYAnim,
     ]);
 

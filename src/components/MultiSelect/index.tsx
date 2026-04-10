@@ -101,6 +101,7 @@ const MultiSelectComponent = React.forwardRef<
     excludeSearchItems = [],
     animationDuration = 250,
     animationEnabled = true,
+    animationOffsetX = 0,
     animationOffsetY = 0,
   } = props;
 
@@ -116,6 +117,7 @@ const MultiSelectComponent = React.forwardRef<
   // Animation
   const [fadeAnim] = useState(new Animated.Value(0));
   const [scaleAnim] = useState(new Animated.Value(0));
+  const [translateXAnim] = useState(new Animated.Value(0));
   const [translateYAnim] = useState(new Animated.Value(0));
   const animatingRef = useRef<boolean>(false);
   const measuredHeightRef = useRef<number>(0);
@@ -174,14 +176,17 @@ const MultiSelectComponent = React.forwardRef<
   const animateIn = useCallback(() => {
     animatingRef.current = true;
     const totalTranslateY =
-      (position?.height ?? 0) +
-      (measuredHeightRef.current || maxHeight) / 2 +
+      -((position?.height ?? 0) + (measuredHeightRef.current || maxHeight)) /
+        2 +
       animationOffsetY;
-    translateYAnim.setValue(-totalTranslateY);
+    translateYAnim.setValue(totalTranslateY);
+    const totalTranslateX = -((position?.width ?? 0) / 2) + animationOffsetX;
+    translateXAnim.setValue(totalTranslateX);
 
     if (!animationEnabled) {
       fadeAnim.setValue(1);
       scaleAnim.setValue(1);
+      translateXAnim.setValue(0);
       translateYAnim.setValue(0);
       animatingRef.current = false;
       return;
@@ -200,6 +205,12 @@ const MultiSelectComponent = React.forwardRef<
         useNativeDriver: true,
         easing: Easing.out(Easing.ease),
       }),
+      Animated.timing(translateXAnim, {
+        toValue: 0,
+        duration: animationDuration,
+        useNativeDriver: true,
+        easing: Easing.out(Easing.ease),
+      }),
       Animated.timing(translateYAnim, {
         toValue: 0,
         duration: animationDuration,
@@ -212,11 +223,14 @@ const MultiSelectComponent = React.forwardRef<
   }, [
     animationDuration,
     animationEnabled,
+    animationOffsetX,
     animationOffsetY,
     fadeAnim,
     maxHeight,
     position?.height,
+    position?.width,
     scaleAnim,
+    translateXAnim,
     translateYAnim,
   ]);
 
@@ -227,6 +241,7 @@ const MultiSelectComponent = React.forwardRef<
       if (!animationEnabled) {
         fadeAnim.setValue(0);
         scaleAnim.setValue(0);
+        translateXAnim.setValue(0);
         animatingRef.current = false;
         callback?.();
         return;
@@ -245,12 +260,18 @@ const MultiSelectComponent = React.forwardRef<
           useNativeDriver: true,
           easing: Easing.in(Easing.ease),
         }),
+        Animated.timing(translateXAnim, {
+          toValue: -((position?.width ?? 0) / 2) + animationOffsetX,
+          duration: animationDuration,
+          useNativeDriver: true,
+          easing: Easing.in(Easing.ease),
+        }),
         Animated.timing(translateYAnim, {
-          toValue: -(
-            (position?.height ?? 0) +
-            (measuredHeightRef.current || maxHeight) / 2 +
-            animationOffsetY
-          ),
+          toValue:
+            -(
+              (position?.height ?? 0) +
+              (measuredHeightRef.current || maxHeight) / 2
+            ) + animationOffsetY,
           duration: animationDuration,
           useNativeDriver: true,
           easing: Easing.in(Easing.ease),
@@ -263,11 +284,14 @@ const MultiSelectComponent = React.forwardRef<
     [
       animationDuration,
       animationEnabled,
+      animationOffsetX,
       animationOffsetY,
       fadeAnim,
       maxHeight,
       position?.height,
+      position?.width,
       scaleAnim,
+      translateXAnim,
       translateYAnim,
     ]
   );
@@ -808,6 +832,7 @@ const MultiSelectComponent = React.forwardRef<
                         width,
                         opacity: fadeAnim,
                         transform: [
+                          { translateX: translateXAnim },
                           { translateY: translateYAnim },
                           { scale: scaleAnim },
                         ],
@@ -843,6 +868,7 @@ const MultiSelectComponent = React.forwardRef<
     _renderList,
     fadeAnim,
     scaleAnim,
+    translateXAnim,
     translateYAnim,
   ]);
 
