@@ -115,6 +115,7 @@ const DropdownComponent = React.forwardRef<IDropdownRef, DropdownProps<any>>(
     const [scaleAnim] = useState(new Animated.Value(0));
     const [translateYAnim] = useState(new Animated.Value(0));
     const animatingRef = useRef<boolean>(false);
+    const measuredHeightRef = useRef<number>(0);
 
     const { width: W, height: H } = Dimensions.get('window');
     const styleContainerVertical: ViewStyle = useMemo(() => {
@@ -169,7 +170,8 @@ const DropdownComponent = React.forwardRef<IDropdownRef, DropdownProps<any>>(
 
     const animateIn = useCallback(() => {
       animatingRef.current = true;
-      const totalTranslateY = (position?.height ?? 0) + maxHeight / 2;
+      const totalTranslateY =
+        (position?.height ?? 0) + measuredHeightRef.current / 2;
       translateYAnim.setValue(-totalTranslateY);
 
       if (!animationEnabled) {
@@ -206,7 +208,6 @@ const DropdownComponent = React.forwardRef<IDropdownRef, DropdownProps<any>>(
       animationDuration,
       animationEnabled,
       fadeAnim,
-      maxHeight,
       position?.height,
       scaleAnim,
       translateYAnim,
@@ -238,7 +239,7 @@ const DropdownComponent = React.forwardRef<IDropdownRef, DropdownProps<any>>(
             easing: Easing.in(Easing.ease),
           }),
           Animated.timing(translateYAnim, {
-            toValue: -((position?.height ?? 0) + maxHeight / 2),
+            toValue: -((position?.height ?? 0) + measuredHeightRef.current / 2),
             duration: animationDuration,
             useNativeDriver: true,
             easing: Easing.in(Easing.ease),
@@ -252,7 +253,6 @@ const DropdownComponent = React.forwardRef<IDropdownRef, DropdownProps<any>>(
         animationDuration,
         animationEnabled,
         fadeAnim,
-        maxHeight,
         position?.height,
         scaleAnim,
         translateYAnim,
@@ -868,6 +868,49 @@ const DropdownComponent = React.forwardRef<IDropdownRef, DropdownProps<any>>(
       translateYAnim,
     ]);
 
+    // NOTE: This invisible dropdown is used to measure the height of the dropdown content for animation purposes. It is rendered off-screen and hidden from the user.
+    const _renderInvisibleDropdown = useCallback(() => {
+      if (!position) return null;
+      const { isFull, width, left } = position;
+
+      const styleVertical: ViewStyle = {
+        left,
+        maxHeight: maxHeight,
+        minHeight: minHeight,
+      };
+
+      return (
+        <View
+          pointerEvents="none"
+          onLayout={(e) => {
+            measuredHeightRef.current = e.nativeEvent.layout.height;
+          }}
+          style={StyleSheet.flatten([
+            styles.container,
+            isFull ? styleHorizontal : styleVertical,
+            { width, opacity: 0, position: 'absolute' },
+            containerStyle,
+          ])}
+        >
+          <View style={styles.flexShrink}>
+            {renderSearch()}
+            {listData && listData.length > 0
+              ? listData.map((item, index) => _renderItem({ item, index }))
+              : null}
+          </View>
+        </View>
+      );
+    }, [
+      position,
+      maxHeight,
+      minHeight,
+      styleHorizontal,
+      containerStyle,
+      renderSearch,
+      listData,
+      _renderItem,
+    ]);
+
     return (
       <View
         style={StyleSheet.flatten([styles.mainWrap, style])}
@@ -876,6 +919,7 @@ const DropdownComponent = React.forwardRef<IDropdownRef, DropdownProps<any>>(
       >
         {_renderDropdown()}
         {_renderModal()}
+        {_renderInvisibleDropdown()}
       </View>
     );
   }
