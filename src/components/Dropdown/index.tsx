@@ -113,13 +113,13 @@ const DropdownComponent = React.forwardRef<IDropdownRef, DropdownProps<any>>(
     const [searchText, setSearchText] = useState('');
 
     // Added for animation
-    const [dynamicWidth, setDynamicWidth] = useState<number>(0);
     const [fadeAnim] = useState(new Animated.Value(0));
     const [scaleAnim] = useState(new Animated.Value(0));
     const [translateXAnim] = useState(new Animated.Value(0));
     const [translateYAnim] = useState(new Animated.Value(0));
     const animatingRef = useRef<boolean>(false);
     const measuredHeightRef = useRef<number>(0);
+    const measuredWidthRef = useRef<number>(0);
 
     const { width: W, height: H } = Dimensions.get('window');
     const styleContainerVertical: ViewStyle = useMemo(() => {
@@ -174,13 +174,18 @@ const DropdownComponent = React.forwardRef<IDropdownRef, DropdownProps<any>>(
 
     const animateIn = useCallback(() => {
       animatingRef.current = true;
+
+      const totalTranslateX =
+        -(((measuredWidthRef.current || position?.width) ?? 0) / 2) +
+        animationOffsetX;
+
       const totalTranslateY =
         -((position?.height ?? 0) + measuredHeightRef.current / 2) +
         animationOffsetY;
-      translateYAnim.setValue(totalTranslateY);
-      const totalTranslateX =
-        -(((dynamicWidth || position?.width) ?? 0) / 2) + animationOffsetX;
+
       translateXAnim.setValue(totalTranslateX);
+
+      translateYAnim.setValue(totalTranslateY);
 
       if (!animationEnabled) {
         fadeAnim.setValue(1);
@@ -224,7 +229,6 @@ const DropdownComponent = React.forwardRef<IDropdownRef, DropdownProps<any>>(
       animationEnabled,
       animationOffsetX,
       animationOffsetY,
-      dynamicWidth,
       fadeAnim,
       position?.height,
       position?.width,
@@ -246,6 +250,14 @@ const DropdownComponent = React.forwardRef<IDropdownRef, DropdownProps<any>>(
           return;
         }
 
+        const totalTranslateX =
+          -(((measuredWidthRef.current || position?.width) ?? 0) / 2) +
+          animationOffsetX;
+
+        const totalTranslateY =
+          -((position?.height ?? 0) + measuredHeightRef.current / 2) +
+          animationOffsetY;
+
         Animated.parallel([
           Animated.timing(fadeAnim, {
             toValue: 0,
@@ -260,17 +272,13 @@ const DropdownComponent = React.forwardRef<IDropdownRef, DropdownProps<any>>(
             easing: Easing.in(Easing.ease),
           }),
           Animated.timing(translateXAnim, {
-            toValue:
-              -(((dynamicWidth || position?.width) ?? 0) / 2) +
-              animationOffsetX,
+            toValue: totalTranslateX,
             duration: animationDuration,
             useNativeDriver: true,
             easing: Easing.in(Easing.ease),
           }),
           Animated.timing(translateYAnim, {
-            toValue:
-              -((position?.height ?? 0) + measuredHeightRef.current / 2) +
-              animationOffsetY,
+            toValue: totalTranslateY,
             duration: animationDuration,
             useNativeDriver: true,
             easing: Easing.in(Easing.ease),
@@ -285,7 +293,6 @@ const DropdownComponent = React.forwardRef<IDropdownRef, DropdownProps<any>>(
         animationEnabled,
         animationOffsetX,
         animationOffsetY,
-        dynamicWidth,
         fadeAnim,
         position?.height,
         position?.width,
@@ -332,41 +339,32 @@ const DropdownComponent = React.forwardRef<IDropdownRef, DropdownProps<any>>(
       }
     }, [fontFamily]);
 
-    const _measure = useCallback(
-      (e?) => {
-        if (ref && ref?.current) {
-          ref.current.measureInWindow((pageX, pageY, width, height) => {
-            let isFull = isTablet
-              ? false
-              : mode === 'modal' || orientation === 'LANDSCAPE';
+    const _measure = useCallback(() => {
+      if (ref && ref?.current) {
+        ref.current.measureInWindow((pageX, pageY, width, height) => {
+          let isFull = isTablet
+            ? false
+            : mode === 'modal' || orientation === 'LANDSCAPE';
 
-            if (mode === 'auto') {
-              isFull = false;
-            }
+          if (mode === 'auto') {
+            isFull = false;
+          }
 
-            const top = isFull ? 20 : height + pageY + 2;
-            const bottom = H - top + height;
-            const left = I18nManager.isRTL ? W - width - pageX : pageX;
+          const top = isFull ? 20 : height + pageY + 2;
+          const bottom = H - top + height;
+          const left = I18nManager.isRTL ? W - width - pageX : pageX;
 
-            setPosition({
-              isFull,
-              width: Math.floor(width),
-              top: Math.floor(top + statusBarHeight),
-              bottom: Math.floor(bottom - statusBarHeight),
-              left: Math.floor(left),
-              height: Math.floor(height),
-            });
+          setPosition({
+            isFull,
+            width: Math.floor(width),
+            top: Math.floor(top + statusBarHeight),
+            bottom: Math.floor(bottom - statusBarHeight),
+            left: Math.floor(left),
+            height: Math.floor(height),
           });
-        }
-
-        // For handling the dropdown width change dynamically
-        if (e) {
-          const layoutWidth = e?.nativeEvent?.layout?.width || 0;
-          setDynamicWidth(Math.floor(layoutWidth));
-        }
-      },
-      [H, W, orientation, mode]
-    );
+        });
+      }
+    }, [H, W, orientation, mode]);
 
     const onKeyboardDidShow = useCallback(
       (e: KeyboardEvent) => {
@@ -931,6 +929,7 @@ const DropdownComponent = React.forwardRef<IDropdownRef, DropdownProps<any>>(
           pointerEvents="none"
           onLayout={(e) => {
             measuredHeightRef.current = e.nativeEvent.layout.height;
+            measuredWidthRef.current = e.nativeEvent.layout.width;
           }}
           style={StyleSheet.flatten([
             styles.container,
