@@ -177,9 +177,10 @@ const MultiSelectComponent = React.forwardRef<
   const animateIn = useCallback(() => {
     animatingRef.current = true;
     const totalTranslateY =
-      -((position?.height ?? 0) + (measuredHeightRef.current || maxHeight)) /
-        2 +
-      animationOffsetY;
+      -(
+        (position?.height ?? 0) +
+        (measuredHeightRef.current || maxHeight) / 2
+      ) + animationOffsetY;
 
     const totalTranslateX =
       -((measuredWidthRef.current ?? 0) / 2) + animationOffsetX;
@@ -251,9 +252,10 @@ const MultiSelectComponent = React.forwardRef<
       }
 
       const totalTranslateY =
-        -((position?.height ?? 0) + (measuredHeightRef.current || maxHeight)) /
-          2 +
-        animationOffsetY;
+        -(
+          (position?.height ?? 0) +
+          (measuredHeightRef.current || maxHeight) / 2
+        ) + animationOffsetY;
 
       const totalTranslateX =
         -((measuredWidthRef.current ?? 0) / 2) + animationOffsetX;
