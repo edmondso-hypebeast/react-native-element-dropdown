@@ -121,6 +121,7 @@ const MultiSelectComponent = React.forwardRef<
   const [translateYAnim] = useState(new Animated.Value(0));
   const animatingRef = useRef<boolean>(false);
   const measuredHeightRef = useRef<number>(0);
+  const measuredWidthRef = useRef<number>(0);
 
   const { width: W, height: H } = Dimensions.get('window');
   const styleContainerVertical: ViewStyle = useMemo(() => {
@@ -179,8 +180,11 @@ const MultiSelectComponent = React.forwardRef<
       -((position?.height ?? 0) + (measuredHeightRef.current || maxHeight)) /
         2 +
       animationOffsetY;
+
+    const totalTranslateX =
+      -((measuredWidthRef.current ?? 0) / 2) + animationOffsetX;
+
     translateYAnim.setValue(totalTranslateY);
-    const totalTranslateX = -((position?.width ?? 0) / 2) + animationOffsetX;
     translateXAnim.setValue(totalTranslateX);
 
     if (!animationEnabled) {
@@ -228,7 +232,6 @@ const MultiSelectComponent = React.forwardRef<
     fadeAnim,
     maxHeight,
     position?.height,
-    position?.width,
     scaleAnim,
     translateXAnim,
     translateYAnim,
@@ -247,6 +250,14 @@ const MultiSelectComponent = React.forwardRef<
         return;
       }
 
+      const totalTranslateY =
+        -((position?.height ?? 0) + (measuredHeightRef.current || maxHeight)) /
+          2 +
+        animationOffsetY;
+
+      const totalTranslateX =
+        -((measuredWidthRef.current ?? 0) / 2) + animationOffsetX;
+
       Animated.parallel([
         Animated.timing(fadeAnim, {
           toValue: 0,
@@ -261,17 +272,13 @@ const MultiSelectComponent = React.forwardRef<
           easing: Easing.in(Easing.ease),
         }),
         Animated.timing(translateXAnim, {
-          toValue: -((position?.width ?? 0) / 2) + animationOffsetX,
+          toValue: totalTranslateX,
           duration: animationDuration,
           useNativeDriver: true,
           easing: Easing.in(Easing.ease),
         }),
         Animated.timing(translateYAnim, {
-          toValue:
-            -(
-              (position?.height ?? 0) +
-              (measuredHeightRef.current || maxHeight) / 2
-            ) + animationOffsetY,
+          toValue: totalTranslateY,
           duration: animationDuration,
           useNativeDriver: true,
           easing: Easing.in(Easing.ease),
@@ -289,7 +296,6 @@ const MultiSelectComponent = React.forwardRef<
       fadeAnim,
       maxHeight,
       position?.height,
-      position?.width,
       scaleAnim,
       translateXAnim,
       translateYAnim,
@@ -887,6 +893,7 @@ const MultiSelectComponent = React.forwardRef<
         pointerEvents="none"
         onLayout={(e) => {
           measuredHeightRef.current = e.nativeEvent.layout.height;
+          measuredWidthRef.current = e.nativeEvent.layout.width;
         }}
         style={StyleSheet.flatten([
           styles.container,
